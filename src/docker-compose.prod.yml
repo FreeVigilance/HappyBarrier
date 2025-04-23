@@ -1,0 +1,297 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: production
+    container_name: django_backend
+    working_dir: /backend_app
+    restart: always
+    env_file:
+      - backend/prod.env
+    environment:
+      - DJANGO_ENV=production
+      - DJANGO_LOGLEVEL=info
+      - DATABASE_ENGINE=postgresql
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - TZ=Europe/Moscow
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend/staticfiles:/backend_app/staticfiles
+      - ./backend/logs:/backend_app/logs
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  db:
+    image: postgres:15.12
+    container_name: postgres_db
+    restart: always
+    env_file:
+      - backend/prod.env
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - TZ=Europe/Moscow
+      - PGTZ=Europe/Moscow
+    command: >
+      postgres
+      -c log_timezone=Europe/Moscow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+    container_name: react_frontend
+    working_dir: /frontend_app
+    restart: always
+    env_file:
+      - frontend/prod.env
+    environment:
+      - NODE_ENV=production
+      - TZ=Europe/Moscow
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:4173/ || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  nginx:
+    image: nginx:1.27.4
+    container_name: nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - TZ=Europe/Moscow
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      kafka-ui:
+        condition: service_healthy
+      grafana:
+        condition: service_healthy
+    volumes:
+      - ./nginx.prod.conf:/etc/nginx/nginx.conf
+      - ./certs:/etc/nginx/certs:ro
+      - ./backend/staticfiles:/backend_app/staticfiles
+      - ./swagger:/swagger_ui:ro
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  kafka:
+    image: bitnami/kafka:3.9.0
+    container_name: kafka
+    restart: always
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    env_file:
+      - kafka/kafka.env
+    environment:
+      - TZ=Europe/Moscow
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LOG_DIRS=/bitnami/kafka/data
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  kafka-init:
+    image: bitnami/kafka:3.9.0
+    container_name: kafka-init
+    env_file:
+      - kafka/kafka.env
+    environment:
+      - TZ=Europe/Moscow
+    entrypoint: [ "/bin/bash", "-c", "/init_topics.sh" ]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./kafka/init_topics.sh:/init_topics.sh
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+        max-file: "5"
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    restart: always
+    env_file:
+      - kafka/kafka-ui.env
+    environment:
+      - TZ=Europe/Moscow
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_NAME=kraft
+      - AUTH_TYPE=LOGIN_FORM
+      - LOGGING_LEVEL_COM_PROVECTUS=INFO
+      - SERVER_SERVLET_CONTEXT_PATH=/kafka_ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:8080/kafka_ui/ || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  loki:
+    image: grafana/loki:3.4.3
+    container_name: loki
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+    command: -config.file=/etc/loki/loki-config.yml
+    volumes:
+      - ./monitoring/loki/loki-config.yml:/etc/loki/loki-config.yml
+      - loki_data:/loki
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:3100/ready || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  promtail:
+    image: grafana/promtail:3.4.3
+    container_name: promtail
+    restart: always
+    environment:
+      - TZ=Europe/Moscow
+    command: -config.file=/etc/promtail/promtail-config.yml
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /etc/machine-id:/etc/machine-id:ro
+      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/promtail-config.yml
+      - ./monitoring/promtail/tmp:/tmp
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c 'printf \"GET / HTTP/1.1\n\n\" > /dev/tcp/127.0.0.1/9080; exit $?;'" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+  grafana:
+    image: grafana/grafana:11.6.0
+    container_name: grafana
+    restart: always
+    env_file:
+      - ./monitoring/grafana.env
+    environment:
+      - GF_SERVER_ROOT_URL=/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_LIVE_ENABLED=false
+      - TZ=Europe/Moscow
+    depends_on:
+      promtail:
+        condition: service_healthy
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+      - ./monitoring/grafana/dashboards:/etc/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:3000/api/health || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "20"
+
+volumes:
+  postgres_data:
+  kafka_data:
+  loki_data:
+  grafana_data:

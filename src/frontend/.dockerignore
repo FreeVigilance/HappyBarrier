@@ -1,0 +1,10 @@
+# Logs
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+*.log
+
+# Local settings
+*.env
+
+README.md

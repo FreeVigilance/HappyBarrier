@@ -1,0 +1,180 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      target: development
+    container_name: django_backend
+    working_dir: /backend_app
+    ports:
+      - "8000:8000"
+    env_file:
+      - backend/.env
+    environment:
+      - DJANGO_ENV=development
+      - DJANGO_LOGLEVEL=debug
+      - DATABASE_ENGINE=postgresql
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - TZ=Europe/Moscow
+    depends_on:
+      db:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./backend:/backend_app
+      - ./backend/logs:/backend_app/logs
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:8000/health/ || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+  db:
+    image: postgres:15.12
+    container_name: postgres_db
+    ports:
+      - "5432:5432"
+    env_file:
+      - backend/.env
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_PORT=5432
+      - TZ=Europe/Moscow
+      - PGTZ=Europe/Moscow
+    command: >
+      postgres
+      -c log_timezone=Europe/Moscow
+    volumes:
+      - postgres_data_dev:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: ./frontend
+      target: development
+    container_name: react_frontend
+    working_dir: /frontend_app
+    ports:
+      - "5173:5173"
+    env_file:
+      - frontend/.env
+    environment:
+      - NODE_ENV=development
+      - TZ=Europe/Moscow
+    depends_on:
+      backend:
+        condition: service_healthy
+    volumes:
+      - ./frontend:/frontend_app
+      - /frontend_app/node_modules
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:5173/ || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+  nginx:
+    image: nginx:1.27.4
+    container_name: nginx
+    ports:
+      - "80:80"
+    environment:
+      - TZ=Europe/Moscow
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      kafka-ui:
+        condition: service_healthy
+    volumes:
+      - ./nginx.dev.conf:/etc/nginx/nginx.conf
+      - ./backend/staticfiles:/backend_app/staticfiles
+      - ./swagger:/swagger_ui:ro
+    healthcheck:
+      test: ["CMD", "service", "nginx", "status"]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+  kafka:
+    image: bitnami/kafka:3.9.0
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    env_file:
+      - kafka/kafka.env
+    environment:
+      - TZ=Europe/Moscow
+      - KAFKA_ENABLE_KRAFT=yes
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_BROKER_ID=1
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=false
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LOG_DIRS=/bitnami/kafka/data
+    volumes:
+      - kafka_data_dev:/bitnami/kafka
+    healthcheck:
+      test: [ "CMD", "kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+  kafka-init:
+    image: bitnami/kafka:3.9.0
+    container_name: kafka-init
+    env_file:
+      - kafka/kafka.env
+    environment:
+      - TZ=Europe/Moscow
+    entrypoint: [ "/bin/bash", "-c", "/init_topics.sh" ]
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - ./kafka/init_topics.sh:/init_topics.sh
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    env_file:
+      - kafka/kafka-ui.env
+    environment:
+      - TZ=Europe/Moscow
+      - KAFKA_CLUSTERS_0_BOOTSTRAP_SERVERS=kafka:9092
+      - KAFKA_CLUSTERS_0_NAME=kraft
+      - AUTH_TYPE=LOGIN_FORM
+      - LOGGING_LEVEL_COM_PROVECTUS=INFO
+      - SERVER_SERVLET_CONTEXT_PATH=/kafka_ui
+    depends_on:
+      kafka:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -q http://localhost:8080/kafka_ui/ || exit 1" ]
+      interval: 20s
+      timeout: 30s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  postgres_data_dev:
+  kafka_data_dev:

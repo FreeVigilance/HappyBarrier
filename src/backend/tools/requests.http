@@ -1,0 +1,398 @@
+@host = http://127.0.0.1:8000/api
+@admin_id =
+@admin_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ2OTExMzMyLCJpYXQiOjE3NDQzMTkzMzIsImp0aSI6IjU3OTZiNzhlYjJmMzQyN2I4YTU0ZjY3MmMzMmQxOTUyIiwidXNlcl9pZCI6MX0.n3fCYMUMZApL-O-f60vZeCuqxmy0E-CWTD_3mZobACg
+@user_id =
+@user_token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQ2OTExMjE1LCJpYXQiOjE3NDQzMTkyMTUsImp0aSI6IjlhNDNiOGYyMTkxNjQ1MzJiZDQ0MDBmZmQ4NWM3N2MyIiwidXNlcl9pZCI6Mn0.wmCBWBBEQ1XA9VK6_3rKZm_ergkM-HjORckWVvToa28
+@user_refresh_token =
+@admin_refresh_token =
+
+### Send code
+POST {{host}}/auth/codes/
+Content-Type: application/json
+
+{
+  "phone": "+79991234567",
+  "mode": "login"
+}
+
+### Verify code
+PATCH {{host}}/auth/codes/verify/
+Content-Type: application/json
+
+{
+  "phone": "+79991234567",
+  "verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya",
+  "code": "605549"
+}
+
+### Login
+POST {{host}}/auth/login/
+Content-Type: application/json
+
+{
+  "phone": "+79991234567",
+  "verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya"
+}
+
+### Get profile - USER
+GET {{host}}/users/me/
+Authorization: Bearer {{user_token}}
+
+### Get profile - ADMIN
+PATCH {{host}}/users/me/
+Authorization: Bearer {{admin_token}}
+
+### Edit profile
+PATCH {{host}}/users/me/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "phone_privacy": "public",
+  "full_name": "John Doe"
+}
+
+### Delete profile
+DELETE {{host}}/users/me/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya"
+}
+
+### Refresh token - USER
+POST {{host}}/auth/token/refresh/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "refresh": "{{user_token}}"
+}
+
+### Refresh token - ADMIN
+POST {{host}}/auth/token/refresh/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "refresh": "{{admin_token}}"
+}
+
+### Change main phone (need verification)
+PATCH {{host}}/users/me/phone/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "new_phone": "+79991234567",
+  "old_verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya",
+  "new_verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya"
+}
+
+### Change password - ADMIN (need verification)
+PATCH {{host}}/users/me/password/reset/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "new_password": "NewPassword123",
+  "verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya"
+}
+
+### Reset password - ADMIN (need verification)
+PATCH {{host}}/users/me/password/reset/
+Content-Type: application/json
+
+{
+  "phone": "+79991234567",
+  "new_password": "NewPassword123",
+  "verification_token": "4LLAWF4tSWrAKnpAiJZi0G430tgOl2Ya"
+}
+
+### Get user - ADMIN
+GET {{host}}/admin/users/{{user_id}}/
+Authorization: Bearer {{admin_token}}
+
+### Block user - ADMIN
+PATCH {{host}}/admin/users/{{user_id}}/block/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+### Unblock user - ADMIN
+PATCH {{host}}/admin/users/{{user_id}}/unblock/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+
+### Search user by phone - ADMIN
+POST {{host}}/users/search/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "phone": "+79991234567"
+}
+
+
+
+
+### Create barrier - ADMIN
+POST {{host}}/admin/barriers/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "device_phone": "+79991234567",
+  "address": "Москва",
+  "device_model": "RTU5025",
+  "device_phones_amount": 100,
+  "device_password": "1234",
+  "additional_info": "",
+  "is_public": true
+}
+
+### Get my barriers - ADMIN
+GET {{host}}/admin/barriers/my/?ordering=-created_at
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+### Get my barriers - USER
+GET {{host}}/barriers/my/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+
+### Get barriers - USER
+GET {{host}}/barriers/?page_size=15
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+### Get barrier - ADMIN
+GET {{host}}/admin/barriers/4/
+Authorization: Bearer {{admin_token}}
+
+### Patch barrier - ADMIN, fields = ["device_password", "additional_info", "is_public"]
+PATCH {{host}}/admin/barriers/3/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "is_public": false
+}
+
+### Delete barrier - ADMIN
+DELETE {{host}}/admin/barriers/4/
+Authorization: Bearer {{admin_token}}
+
+### Get barrier - USER
+GET {{host}}/barriers/16/
+Authorization: Bearer {{user_token}}
+
+
+
+### Create access request - USER
+POST {{host}}/access_requests/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "user": {{user_id}},
+  "barrier": 1
+}
+
+### Create access request - USER - Wrong user number
+POST {{host}}/access_requests/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "user": 4,
+  "barrier": 16
+}
+
+### Create access request - USER - Wrong barrier number  (inactive, private, not exists)
+POST {{host}}/access_requests/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "user": {{user_id}},
+  "barrier": 4
+}
+
+
+### Create access request - ADMIN like user
+POST {{host}}/access_requests/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user": {{admin_id}},
+  "barrier": 13
+}
+
+### Create access request - ADMIN like user - Wrong user number
+POST {{host}}/access_requests/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user": {{user_id}},
+  "barrier": 16
+}
+
+### Create access request - ADMIN like user - Wrong barrier number  (inactive, private, not exists)
+POST {{host}}/access_requests/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user": {{admin_id}},
+  "barrier": 4
+}
+
+### Create access request - ADMIN like admin
+POST {{host}}/admin/access_requests/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user": {{admin_id}},
+  "barrier": 5
+}
+
+### Create access request - ADMIN like admin - Wrong barrier number
+POST {{host}}/admin/access_requests/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user": {{admin_id}},
+  "barrier": 4
+}
+
+### Create access request - ADMIN like admin - Wrong user number
+POST {{host}}/admin/access_requests/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user": {{user_id}},
+  "barrier": 15
+}
+
+### Get my access requests - USER
+GET {{host}}/access_requests/my/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+### Get my access requests - ADMIN like user
+GET {{host}}/access_requests/my/?status=pending&type=outgoing
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+
+### Get my access requests - ADMIN like admin
+GET {{host}}/admin/access_requests/my/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+
+### Get access request - USER
+GET {{host}}/access_requests/11/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+
+### Get access request - ADMIN like user
+GET {{host}}/access_requests/2/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+
+### Get access request - ADMIN like admin
+GET {{host}}/admin/access_requests/6/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+
+### Update access request - USER
+PATCH {{host}}/access_requests/3/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "status": "accepted",
+  "hidden_for_user": false
+}
+
+### Update access request - ADMIN like user
+PATCH {{host}}/access_requests/8/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "pending",
+  "hidden_for_user": false
+}
+
+### Update access request - ADMIN like admin
+PATCH {{host}}/admin/access_requests/9/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "status": "cancelled",
+  "hidden_for_admin": true
+}
+
+
+### Get limits - USER
+GET {{host}}/barriers/16/limits/
+Authorization: Bearer {{user_token}}
+
+### Get limits - ADMIN
+GET {{host}}/barriers/1/limits/
+Authorization: Bearer {{admin_token}}
+
+### Set limits - USER - access denied
+PATCH {{host}}/admin/barriers/16/limits/
+Authorization: Bearer {{user_token}}
+Content-Type: application/json
+
+{
+  "phone_per_user_limit": 100
+}
+
+### PUT limits - ADMIN - access denied
+PUT {{host}}/admin/barriers/16/limits/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "phone_per_user_limit": 100
+}
+
+### Set limits - ADMIN
+PATCH {{host}}/admin/barriers/16/limits/
+Authorization: Bearer {{admin_token}}
+Content-Type: application/json
+
+{
+  "user_phone_limit": 100,
+  "user_temp_phone_limit": 100,
+  "global_temp_phone_limit": null
+}
+
+### Leave barrier - USER
+DELETE {{host}}/barriers/1/leave/
+Authorization: Bearer {{user_token}}
+
+### GET barrier users - ADMIN
+GET {{host}}/admin/barriers/1/users/
+Authorization: Bearer {{admin_token}}
+
+### Delete user from barrier - ADMIN
+DELETE {{host}}/admin/barriers/1/users/1/
+Authorization: Bearer {{admin_token}}
