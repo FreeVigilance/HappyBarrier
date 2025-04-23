@@ -1,0 +1,29 @@
+.DS_Store
+trash/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+
+# Virtualenv
+.venv/
+
+# SQLite DB
+*.sqlite3
+
+# Local settings
+*.env
+
+# Logs
+*.log
+logs/
+
+# test
+.pytest_cache/
+.ruff_cache
+*.toml
+
+.dockerignore
