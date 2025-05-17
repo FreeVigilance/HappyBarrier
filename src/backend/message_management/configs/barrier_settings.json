@@ -1,0 +1,262 @@
+{
+  "RTU5025": {
+    "start": {
+      "name": "Начало работы",
+      "description": "Запускает GSM модуль, включает в работу.",
+      "template": "{pwd}TEL0007{local_phone}",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "example": "1234",
+          "description": "Пароль от устройства - 4 цифры."
+        },
+        {
+          "name": "Номер установленной в устройстве SIM-карты",
+          "key": "local_phone",
+          "example": "9854500040",
+          "description": "Стандартный российский номер телефона, без пробелов, без +7, начинается например с 999"
+        }
+      ],
+      "example": "1234TEL00079854500040"
+    },
+    "password_change": {
+      "name": "Смена пароля",
+      "description": "Смена пароля",
+      "template": "{pwd}P{newpwd}",
+      "params": [
+        {
+          "name": "Текущий пароль",
+          "key": "pwd",
+          "example": "1234",
+          "description": "текущий пароль"
+        },
+        {
+          "name": "Новый пароль",
+          "key": "newpwd",
+          "example": "1234",
+          "description": "новый пароль"
+        }
+      ],
+      "example": "1234P5678"
+    },
+    "get_phone": {
+      "name": "Запрос номера в списке",
+      "description": "Запрос номера в списке",
+      "template": "{pwd}A{index}#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        },
+        {
+          "name": "Серийный номер — положение номера в списке (от 001 до 999).",
+          "key": "index",
+          "description": "Серийный номер — положение номера в списке (от 001 до 999).",
+          "example": "003"
+        }
+      ],
+      "example": "1234A003#"
+    },
+    "get_phones": {
+      "name": "Запрос нескольких номеров в списке",
+      "template": "{pwd}AL{start_index}#{end_index}#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        },
+        {
+          "name": "Начальный серийный номер ",
+          "key": "start_index",
+          "description": "Пароль",
+          "example": "003"
+        },
+        {
+          "name": "Конечный серийный номер",
+          "key": "end_index",
+          "description": "Конечный серийный номер",
+          "example": "050"
+        }
+      ],
+      "example": "1234AL003#050#"
+    },
+    "all_access": {
+      "name": "Управление по звонку с любого номера",
+      "description": "Управление по звонку с любого номера",
+      "template": "{pwd}ALL#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        }
+      ],
+      "example": "1234ALL#"
+    },
+    "restrict_access": {
+      "name": "Управление по звонку только с разрешенных номеров",
+      "description": "Управление по звонку только с разрешенных номеров",
+      "template": "{pwd}AUT#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        }
+      ],
+      "example": "1234AUT#"
+    },
+    "close_time": {
+      "name": "Сколько времени держать закрытым после звонка от 000 до 999 в секундах",
+      "description": "Сколько времени держать закрытым после звонка от 000 до 999 в секундах",
+      "template": "{pwd}GOT{time}#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        },
+        {
+          "name": "Время до открытия в секундах",
+          "key": "time",
+          "description": "Время до открытия в секундах",
+          "example": "030"
+        }
+      ],
+      "example": "1234GOT030#"
+    },
+    "turn_on_messages": {
+      "name": "Включить сообщения об изменении состояния",
+      "description": "Включить сообщения об изменении состояния",
+      "template": "{pwd}G{condition}{who}{msg}#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        },
+        {
+          "name": "На какое состояние нужны сообщения? ON - на закрытое, OFF на открытое",
+          "key": "condition",
+          "description": "На какое состояние нужны сообщения? ON - на закрытое, OFF на открытое",
+          "example": "ON"
+        },
+        {
+          "name": "Кому отправлять сообщения? Две цифры, первая говорит отправлять ли первому номеру в таблице, вторая говорит отправлять ли тому кто позвонил. 0 это не отправлять, 1 это отправлять",
+          "key": "who",
+          "description": "Кому отправлять сообщения? Две цифры, первая говорит отправлять ли первому номеру в таблице, вторая говорит отправлять ли тому кто позвонил. 0 это не отправлять, 1 это отправлять",
+          "example": "11"
+        },
+        {
+          "name": "Какое сообщение отправлять",
+          "key": "msg",
+          "description": "Какое сообщение отправлять",
+          "example": "Door Open"
+        }
+      ],
+      "example": "1234GON11#Door Open##"
+    },
+    "turn_off_messages": {
+      "name": "Отключить сообщения об изменении состояния",
+      "description": "Отключить сообщения об изменении состояния",
+      "template": "{pwd}G{condition}##",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        },
+        {
+          "name": "На какое состояние нужны сообщения? ON - на закрытое, OFF на открытое",
+          "key": "condition",
+          "description": "На какое состояние нужны сообщения? ON - на закрытое, OFF на открытое",
+          "example": "ON"
+        }
+      ],
+      "example": "1234GON##"
+    },
+    "open_barrier": {
+      "name": "Открыть шлагбаум",
+      "description": "Открыть шлагбаум",
+      "template": "{pwd}DD",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        }
+      ],
+      "example": "1234DD"
+    },
+    "close_barrier": {
+      "name": "Закрыть шлагбаум",
+      "description": "Закрыть шлагбаум",
+      "template": "{pwd}CC",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "description": "Пароль",
+          "example": "1234"
+        }
+      ],
+      "example": "1234CC"
+    }
+  },
+  "Telemetrica": {
+    "start": {
+      "name": "Начало работы",
+      "template": "#0#",
+      "params": [],
+      "example": "#0#"
+    },
+    "get_phones": {
+      "name": "Запрос списка номеров телефона",
+      "template": "#06#",
+      "params": [],
+      "example": "#06#"
+    },
+    "all_access": {
+      "name": "Управление по звонку с любого номера",
+      "template": "#31#1#",
+      "params": [],
+      "example": "#31#1#"
+    },
+    "restrict_access": {
+      "name": "Управление по звонку только с разрешенных номеров",
+      "template": "#31#0#",
+      "params": [],
+      "example": "#31#0#"
+    },
+    "close_time": {
+      "name": "Сколько времени держать закрытым после звонка от 000 до 999 в секундах",
+      "template": "{pwd}GOT{time}#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd",
+          "validation": "^\\d{4}$",
+          "example": "1234"
+        },
+        {
+          "name": "Время до открытия в секундах",
+          "key": "time",
+          "validation": "^\\d{3}$",
+          "example": "030"
+        }
+      ],
+      "example": "1234GOT030#"
+    }
+  }
+}

@@ -1,0 +1,2 @@
+confluent-kafka==2.10.0
+huawei-lte-api==1.11.0

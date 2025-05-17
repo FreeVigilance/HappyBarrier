@@ -1,7 +1,9 @@
 from rest_framework import serializers
+from rest_framework.exceptions import NotFound, PermissionDenied
 
 from access_requests.models import AccessRequest
 from barriers.models import UserBarrier
+from core.utils import ConflictError
 
 
 class AccessRequestSerializer(serializers.ModelSerializer):
@@ -32,6 +34,16 @@ class CreateAccessRequestSerializer(serializers.ModelSerializer):
         model = AccessRequest
         fields = ["user", "barrier"]
 
+    def to_internal_value(self, data):
+        try:
+            return super().to_internal_value(data)
+        except serializers.ValidationError as exc:
+            errors = exc.detail
+            for field, messages in errors.items():
+                if any("does not exist" in str(msg) for msg in messages):
+                    raise NotFound(f"{field.capitalize()} not found.")
+            raise
+
     def validate(self, attrs):
         current_user = self.context["request"].user
         as_admin = self.context.get("as_admin", False)
@@ -43,26 +55,26 @@ class CreateAccessRequestSerializer(serializers.ModelSerializer):
         barrier = attrs["barrier"]
 
         if not barrier.is_active:
-            raise serializers.ValidationError({"error": "Cannot create access request for an inactive barrier."})
+            raise NotFound("Barrier not found.")
+        if not user.is_active:
+            raise NotFound("User not found.")
 
         if request_type == AccessRequest.RequestType.FROM_USER:
             if user != current_user:
-                raise serializers.ValidationError({"error": "Users can only create requests for themselves."})
+                raise PermissionDenied("You cannot create access request for other user.")
             if not barrier.is_public:
-                raise serializers.ValidationError({"error": "Cannot request access to a private barrier."})
+                raise NotFound("Barrier not found.")
         else:
             if barrier.owner != current_user:
-                raise serializers.ValidationError({"error": "You are not the owner of this barrier."})
-            if not user.is_active:
-                raise serializers.ValidationError({"error": "Cannot create access request for an inactive user."})
+                raise PermissionDenied("You do not have access to this barrier.")
 
         # Check for existing pending request
         if AccessRequest.objects.filter(user=user, barrier=barrier, status=AccessRequest.Status.PENDING).exists():
-            raise serializers.ValidationError({"error": "An active request already exists for this user and barrier."})
+            raise ConflictError("An active access request already exists for this user and barrier.")
 
         # Check if user already has access
         if UserBarrier.objects.filter(user=user, barrier=barrier, is_active=True).exists():
-            raise serializers.ValidationError({"error": "This user already has access to the barrier."})
+            raise ConflictError("This user already has access to the barrier.")
 
         return attrs
 
@@ -84,23 +96,25 @@ class UpdateAccessRequestSerializer(serializers.ModelSerializer):
 
         allowed_transitions = AccessRequest.ALLOWED_STATUS_TRANSITIONS.get(current_status, set())
         if new_status != current_status and new_status not in allowed_transitions:
-            raise serializers.ValidationError({"error": f"Invalid status transition: {current_status} -> {new_status}"})
+            raise serializers.ValidationError(
+                {"status": f"Invalid status transition: '{current_status}' -> '{new_status}'."}
+            )
 
         if new_status == AccessRequest.Status.CANCELLED:
             if (not as_admin and request_type == AccessRequest.RequestType.FROM_BARRIER) or (
                 as_admin and request_type == AccessRequest.RequestType.FROM_USER
             ):
-                raise serializers.ValidationError({"error": "You can only cancel your own requests."})
+                raise PermissionDenied("You are not allowed to cancel this request.")
 
         if new_status in {AccessRequest.Status.ACCEPTED, AccessRequest.Status.REJECTED}:
             if (not as_admin and request_type == AccessRequest.RequestType.FROM_USER) or (
                 as_admin and request_type == AccessRequest.RequestType.FROM_BARRIER
             ):
-                raise serializers.ValidationError({"error": "You are not allowed to accept or reject this request."})
+                raise PermissionDenied("You are not allowed to accept or reject this request.")
 
         if "hidden_for_admin" in attrs and not as_admin:
-            raise serializers.ValidationError({"error": "Only admins can modify field 'hidden_for_admin'."})
+            raise serializers.ValidationError({"hidden_for_admin": "Only admins can modify field 'hidden_for_admin'."})
         if "hidden_for_user" in attrs and as_admin:
-            raise serializers.ValidationError({"error": "Only users can modify field 'hidden_for_user'."})
+            raise serializers.ValidationError({"hidden_for_user": "Only users can modify field 'hidden_for_user'."})
 
         return attrs

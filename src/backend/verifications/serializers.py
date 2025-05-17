@@ -9,7 +9,10 @@ from verifications.validators import VerificationCodeValidator, VerificationToke
 
 class SendVerificationCodeSerializer(serializers.Serializer):
     phone = serializers.CharField(max_length=PHONE_MAX_LENGTH, validators=[PhoneNumberValidator()])
-    mode = serializers.ChoiceField(choices=Verification.Mode.choices)
+    mode = serializers.ChoiceField(
+        choices=Verification.Mode.choices,
+        error_messages={"invalid_choice": f"Invalid mode. Valid modes are: {Verification.Mode.values}"},
+    )
 
 
 class VerifyCodeSerializer(serializers.Serializer):

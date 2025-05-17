@@ -1,15 +1,18 @@
 import logging
 
 from django.db.models import Q
+from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import DestroyAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 
+from action_history.models import BarrierActionLog
 from barriers.models import Barrier, BarrierLimit, UserBarrier
 from barriers.serializers import BarrierLimitSerializer, BarrierSerializer
 from core.pagination import BasePaginatedListView
 from core.utils import error_response, success_response
+from phones.models import BarrierPhone
 
 logger = logging.getLogger(__name__)
 
@@ -72,10 +75,14 @@ class BarrierView(RetrieveAPIView):
     lookup_field = "id"
 
     def get_object(self):
-        barrier = super().get_object()
+        try:
+            barrier = super().get_object()
+        except Http404:
+            raise NotFound("Barrier not found.")
+
         user = self.request.user
 
-        if barrier.is_public or (UserBarrier.user_has_access_to_barrier(user, barrier)):
+        if barrier.is_public or UserBarrier.user_has_access_to_barrier(user, barrier):
             return barrier
 
         raise PermissionDenied("You do not have access to this barrier.")
@@ -89,7 +96,11 @@ class BarrierLimitView(RetrieveAPIView):
     lookup_field = "id"
 
     def get_object(self):
-        barrier = super().get_object()
+        try:
+            barrier = super().get_object()
+        except Http404:
+            raise NotFound("Barrier not found.")
+
         user = self.request.user
 
         if not (barrier.is_public or UserBarrier.user_has_access_to_barrier(user, barrier) or barrier.owner == user):
@@ -101,23 +112,31 @@ class BarrierLimitView(RetrieveAPIView):
 
         return barrier.limits
 
-    def get(self, request, *args, **kwargs):
-        return self.retrieve(request, *args, **kwargs)
-
 
 class LeaveBarrierView(DestroyAPIView):
     queryset = Barrier.objects.filter(is_active=True)
     lookup_field = "id"
 
     def delete(self, request, *args, **kwargs):
-        barrier = self.get_object()
+        try:
+            barrier = self.get_object()
+        except Http404:
+            return error_response("Barrier not found.", status.HTTP_404_NOT_FOUND)
+        user = self.request.user
 
-        user_barrier = UserBarrier.objects.filter(user=self.request.user, barrier=barrier, is_active=True).first()
+        user_barrier = UserBarrier.objects.filter(user=user, barrier=barrier, is_active=True).first()
         if not user_barrier:
             return error_response("You do not have access to this barrier.", status.HTTP_403_FORBIDDEN)
 
         user_barrier.is_active = False
         user_barrier.save(update_fields=["is_active"])
+
+        logger.info(f"Deleting all phones for user '{user.id}' while leaving barrier '{barrier.id}'")
+        phones = BarrierPhone.objects.filter(user=user, barrier=barrier, is_active=True)
+        for phone in phones:
+            _, log = phone.remove(author=BarrierActionLog.Author.USER, reason=BarrierActionLog.Reason.BARRIER_EXIT)
+            phone.send_sms_to_delete(log)
+
         return success_response({"message": "Left the barrier successfully."})
 
 
@@ -127,7 +146,7 @@ class BarrierAccessCheckView(APIView):
     def get(self, request, id):
         barrier = Barrier.objects.filter(id=id, is_active=True).first()
         if not barrier:
-            raise NotFound("Barrier not found.")
+            return error_response("Barrier not found.", status.HTTP_404_NOT_FOUND)
 
         has_access = UserBarrier.user_has_access_to_barrier(request.user, barrier)
 

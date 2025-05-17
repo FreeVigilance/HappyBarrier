@@ -1,0 +1,19 @@
+services:
+  sms_service:
+    build:
+      context: .
+    container_name: sms_service
+    working_dir: /sms_service
+    env_file:
+      - .env
+    environment:
+      - TZ=Europe/Moscow
+      - LOGLEVEL=debug
+      - NUMBER_OF_PARTITIONS=3
+    volumes:
+      - .:/sms_service
+    logging:
+      driver: "local"
+      options:
+        max-size: "10m"
+        max-file: "5"

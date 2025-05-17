@@ -1,8 +1,10 @@
 import pytest
+from rest_framework.exceptions import NotFound, PermissionDenied
 
 from access_requests.models import AccessRequest
 from access_requests.serializers import CreateAccessRequestSerializer, UpdateAccessRequestSerializer
 from barriers.models import UserBarrier
+from core.utils import ConflictError
 
 
 @pytest.mark.django_db
@@ -19,16 +21,20 @@ class TestCreateAccessRequestSerializer:
         data = {"user": user.id, "barrier": private_barrier.id}
         serializer = CreateAccessRequestSerializer(data=data, context=context)
 
-        assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "Cannot request access to a private barrier."
+        with pytest.raises(NotFound) as exc_info:
+            serializer.is_valid(raise_exception=True)
+
+        assert str(exc_info.value) == "Barrier not found."
 
     def test_user_cannot_create_for_another_user(self, user, admin_user, barrier):
         context = {"request": type("Request", (), {"user": user})(), "as_admin": False}
         data = {"user": admin_user.id, "barrier": barrier.id}
         serializer = CreateAccessRequestSerializer(data=data, context=context)
 
-        assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "Users can only create requests for themselves."
+        with pytest.raises(PermissionDenied) as exc_info:
+            serializer.is_valid(raise_exception=True)
+
+        assert str(exc_info.value) == "You cannot create access request for other user."
 
     def test_admin_creates_valid_request(self, admin_user, user, barrier):
         context = {"request": type("Request", (), {"user": admin_user})(), "as_admin": True}
@@ -42,8 +48,10 @@ class TestCreateAccessRequestSerializer:
         data = {"user": user.id, "barrier": barrier.id}
         serializer = CreateAccessRequestSerializer(data=data, context=context)
 
-        assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "You are not the owner of this barrier."
+        with pytest.raises(PermissionDenied) as exc_info:
+            serializer.is_valid(raise_exception=True)
+
+        assert str(exc_info.value) == "You do not have access to this barrier."
 
     def test_cannot_create_if_pending_request_exists(self, user, barrier):
         AccessRequest.objects.create(user=user, barrier=barrier, status=AccessRequest.Status.PENDING)
@@ -52,8 +60,10 @@ class TestCreateAccessRequestSerializer:
         data = {"user": user.id, "barrier": barrier.id}
         serializer = CreateAccessRequestSerializer(data=data, context=context)
 
-        assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "An active request already exists for this user and barrier."
+        with pytest.raises(ConflictError) as exc_info:
+            serializer.is_valid(raise_exception=True)
+
+        assert str(exc_info.value) == "An active access request already exists for this user and barrier."
 
     @pytest.fixture
     def public_barrier_with_access(self, user, barrier, access_request):
@@ -67,8 +77,10 @@ class TestCreateAccessRequestSerializer:
         data = {"user": user.id, "barrier": public_barrier_with_access.id}
         serializer = CreateAccessRequestSerializer(data=data, context=context)
 
-        assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "This user already has access to the barrier."
+        with pytest.raises(ConflictError) as exc_info:
+            serializer.is_valid(raise_exception=True)
+
+        assert str(exc_info.value) == "This user already has access to the barrier."
 
 
 @pytest.mark.django_db
@@ -98,7 +110,7 @@ class TestUpdateAccessRequestSerializer:
         serializer = UpdateAccessRequestSerializer(access_request, data=data, partial=True, context=context)
 
         assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "Invalid status transition: accepted -> cancelled"
+        assert serializer.errors["status"][0] == "Invalid status transition: 'accepted' -> 'cancelled'."
 
     def test_user_cannot_accept_request(self, user, barrier):
         access_request = AccessRequest.objects.create(
@@ -111,8 +123,10 @@ class TestUpdateAccessRequestSerializer:
         data = {"status": AccessRequest.Status.ACCEPTED}
         serializer = UpdateAccessRequestSerializer(access_request, data=data, partial=True, context=context)
 
-        assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "You are not allowed to accept or reject this request."
+        with pytest.raises(PermissionDenied) as exc_info:
+            serializer.is_valid(raise_exception=True)
+
+        assert str(exc_info.value) == "You are not allowed to accept or reject this request."
 
     def test_admin_can_accept_user_request(self, user, admin_user, barrier):
         access_request = AccessRequest.objects.create(
@@ -138,7 +152,7 @@ class TestUpdateAccessRequestSerializer:
         serializer = UpdateAccessRequestSerializer(access_request, data=data, partial=True, context=context)
 
         assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "Only admins can modify field 'hidden_for_admin'."
+        assert serializer.errors["hidden_for_admin"][0] == "Only admins can modify field 'hidden_for_admin'."
 
     def test_admin_cannot_change_hidden_for_user(self, user, barrier):
         access_request = AccessRequest.objects.create(
@@ -151,4 +165,4 @@ class TestUpdateAccessRequestSerializer:
         serializer = UpdateAccessRequestSerializer(access_request, data=data, partial=True, context=context)
 
         assert not serializer.is_valid()
-        assert serializer.errors["error"][0] == "Only users can modify field 'hidden_for_user'."
+        assert serializer.errors["hidden_for_user"][0] == "Only users can modify field 'hidden_for_user'."

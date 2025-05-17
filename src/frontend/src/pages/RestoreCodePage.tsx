@@ -89,7 +89,7 @@ const RestoreCodePage: React.FC = () => {
 
       const result = await response.json();
 
-      if (response.ok && result === "Code verified successfully.") {
+      if (response.ok && result.message === "Code verified successfully.") {
         navigate("/restorepassword", {
           state: { phone, verification_token: verificationToken },
         });

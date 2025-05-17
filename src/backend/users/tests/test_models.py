@@ -48,7 +48,7 @@ class TestUserManager:
         response = User.objects.check_phone_blocked(BLOCKED_USER_PHONE)
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert blocked_user.block_reason in response.data["error"]
+        assert response.data["detail"] == f"User is blocked. Reason: '{blocked_user.block_reason}'."
 
 
 @pytest.mark.django_db

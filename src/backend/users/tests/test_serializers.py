@@ -198,7 +198,7 @@ def test_change_phone_with_existing_number(user):
     serializer = ChangePhoneSerializer(data=data)
 
     assert not serializer.is_valid()
-    assert serializer.errors["new_phone"]["error"] == "This phone number is already in use."
+    assert "Given new phone number is already in use." in serializer.errors["new_phone"]
 
 
 def test_incorrect_old_password_raises_error(mocker):
@@ -209,7 +209,7 @@ def test_incorrect_old_password_raises_error(mocker):
     serializer = ChangePasswordSerializer(data=data, context={"request": request_mock})
     assert not serializer.is_valid()
 
-    assert serializer.errors["old_password"]["error"] == "Current password is incorrect."
+    assert "Current password is incorrect." in serializer.errors["old_password"]
 
 
 @pytest.mark.parametrize(

@@ -1,6 +1,7 @@
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import AuthenticationFailed, InvalidToken
+from rest_framework_simplejwt.settings import api_settings
 
 
 class CustomJWTAuthentication(JWTAuthentication):
@@ -14,13 +15,16 @@ class CustomJWTAuthentication(JWTAuthentication):
 
     def get_user(self, validated_token):
         try:
-            user = super().get_user(validated_token)
-        except InvalidToken as e:
-            raise e
-        except AuthenticationFailed as e:
-            if e.detail == "User not found":
-                raise e
-            else:
-                raise PermissionDenied("User is blocked")
+            user_id = validated_token[api_settings.USER_ID_CLAIM]
+        except KeyError:
+            raise InvalidToken("Token contained no recognizable user identification")
+
+        try:
+            user = self.user_model.objects.get(**{api_settings.USER_ID_FIELD: user_id})
+        except self.user_model.DoesNotExist:
+            raise AuthenticationFailed("User not found.", code="user_not_found")
+
+        if not user.is_active:
+            raise PermissionDenied(f"User is blocked. Reason: '{user.block_reason}'.", code="user_inactive")
 
         return user

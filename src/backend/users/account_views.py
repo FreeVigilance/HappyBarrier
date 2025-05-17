@@ -1,13 +1,16 @@
 import logging
 
-from rest_framework import status
 from rest_framework.decorators import permission_classes
-from rest_framework.exceptions import MethodNotAllowed
+from rest_framework.exceptions import MethodNotAllowed, PermissionDenied
 from rest_framework.generics import RetrieveUpdateDestroyAPIView
 from rest_framework.permissions import IsAdminUser
 from rest_framework.views import APIView
 
-from core.utils import deleted_response, error_response, success_response
+from action_history.models import BarrierActionLog
+from barriers.models import Barrier, UserBarrier
+from core.utils import deleted_response, success_response
+from phones.models import BarrierPhone
+from users.models import User
 from users.serializers import (
     ChangePasswordSerializer,
     ChangePhoneSerializer,
@@ -35,12 +38,10 @@ class UserAccountView(RetrieveUpdateDestroyAPIView):
 
         user = self.get_object()
         serializer = UpdateUserSerializer(self.get_object(), data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
 
-        if serializer.is_valid():
-            serializer.save()
-            return success_response(UserSerializer(user).data)
-
-        return error_response(serializer.errors, status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return success_response(UserSerializer(user).data)
 
     def delete(self, request, *args, **kwargs):
         """Deactivate account (verification required)"""
@@ -50,6 +51,9 @@ class UserAccountView(RetrieveUpdateDestroyAPIView):
 
         user = self.get_object()
         verification_token = request.data.get("verification_token")
+
+        if user.role == User.Role.SUPERUSER:
+            raise PermissionDenied("Superuser account cannot be deleted.")
 
         verification, error = VerificationService.get_verified_verification_or_error(
             user.phone, verification_token, Verification.Mode.DELETE_ACCOUNT
@@ -63,6 +67,22 @@ class UserAccountView(RetrieveUpdateDestroyAPIView):
         verification.status = Verification.Status.USED
         verification.save(update_fields=["status"])
 
+        logger.info(f"Deleting user barrier relations on '{user.id}' while deleting user")
+        UserBarrier.objects.filter(user=user, is_active=True).update(is_active=False)
+
+        phones = BarrierPhone.objects.filter(user=user, is_active=True)
+        for phone in phones:
+            _, log = phone.remove(author=BarrierActionLog.Author.USER, reason=BarrierActionLog.Reason.USER_DELETED)
+            phone.send_sms_to_delete(log)
+            logger.info(
+                f"Deleted phone {phone.phone} for user '{user.id}' from barrier '{phone.barrier.id}' "
+                f"while deleting user"
+            )
+
+        if user.role == User.Role.ADMIN:
+            logger.info(f"Deleting all barriers creating by admin '{user.id}' while deleting user")
+            Barrier.objects.filter(owner=user, is_active=True).update(is_active=False)
+
         return deleted_response()
 
     def put(self, request, *args, **kwargs):
@@ -71,6 +91,31 @@ class UserAccountView(RetrieveUpdateDestroyAPIView):
 
 class ChangePhoneView(APIView):
     """Update user's main phone number (verification required with old and new phones)"""
+
+    @staticmethod
+    def update_primary_phones_on_user_change(user, old_phone: str, new_phone: str):
+        old_phones = BarrierPhone.objects.filter(
+            user=user, phone=old_phone, type=BarrierPhone.PhoneType.PRIMARY, is_active=True
+        )
+
+        for old_phone_entry in old_phones:
+            barrier = old_phone_entry.barrier
+
+            _, log = old_phone_entry.remove(
+                author=BarrierActionLog.Author.SYSTEM, reason=BarrierActionLog.Reason.PRIMARY_PHONE_CHANGE
+            )
+            old_phone_entry.send_sms_to_delete(log)
+
+            new_phone_entry, log = BarrierPhone.create(
+                user=user,
+                barrier=barrier,
+                phone=new_phone,
+                type=BarrierPhone.PhoneType.PRIMARY,
+                name=user.get_full_name(),
+                author=BarrierActionLog.Author.SYSTEM,
+                reason=BarrierActionLog.Reason.PRIMARY_PHONE_CHANGE,
+            )
+            new_phone_entry.send_sms_to_create(log)
 
     def patch(self, request):
         serializer = ChangePhoneSerializer(data=request.data)
@@ -94,7 +139,6 @@ class ChangePhoneView(APIView):
         if error:
             return error
 
-        # TODO - add changing phone with other tables like barrier
         user.phone = new_phone
         user.save(update_fields=["phone"])
 
@@ -102,6 +146,8 @@ class ChangePhoneView(APIView):
         verification_old.save(update_fields=["status"])
         verification_new.status = Verification.Status.USED
         verification_new.save(update_fields=["status"])
+
+        self.update_primary_phones_on_user_change(user, old_phone, new_phone)
 
         return success_response(UserSerializer(user).data)
 

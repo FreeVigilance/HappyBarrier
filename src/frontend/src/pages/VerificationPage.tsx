@@ -17,6 +17,10 @@ const VerificationPage: React.FC = () => {
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
+    if (location.state?.error) {
+      setErrorMessage(location.state.error);
+    }
+
     if (timer > 0) {
       const interval = setInterval(() => {
         setTimer((prev) => prev - 1);
@@ -25,7 +29,7 @@ const VerificationPage: React.FC = () => {
     } else {
       setIsResendDisabled(false);
     }
-  }, [timer]);
+  }, [timer, location.state]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +57,8 @@ const VerificationPage: React.FC = () => {
 
       const verifyJson = await verifyResponse.json();
 
-      if (verifyJson === "Code verified successfully.") {
+      console.log(verifyJson.message);
+      if (verifyJson.message === "Code verified successfully.") {
         const loginResponse = await fetch("/api/auth/login/", {
           method: "POST",
           headers: {
@@ -88,7 +93,7 @@ const VerificationPage: React.FC = () => {
           setErrorMessage(loginData.detail || "Ошибка при входе");
         }
       } else {
-        setErrorMessage(verifyJson.detail || "Ошибка верификации");
+        setErrorMessage(verifyJson || "Ошибка верификации");
       }
     } catch (error) {
       console.error("Ошибка сети:", error);
@@ -100,7 +105,6 @@ const VerificationPage: React.FC = () => {
     setTimer(60);
     setIsResendDisabled(true);
     setErrorMessage("");
-    console.log("Повторная отправка кода для:", phone);
 
     try {
       const response = await fetch("/api/auth/codes/", {
@@ -117,10 +121,21 @@ const VerificationPage: React.FC = () => {
 
       const data = await response.json();
 
-      if (response.ok && data.verification_token) {
+      if (response.status === 201 && data.verification_token) {
         setVerificationToken(data.verification_token);
+      } else if (response.status === 400) {
+        const messages = [];
+        if (data.phone) messages.push(...data.phone);
+        if (data.mode) messages.push(...data.mode);
+        setErrorMessage(messages.join(" "));
+      } else if (response.status === 403) {
+        setErrorMessage(data.detail || "Пользователь заблокирован.");
+      } else if (response.status === 404) {
+        setErrorMessage(data.detail || "Пользователь не найден.");
+      } else if (response.status === 429) {
+        setErrorMessage(data.detail || "Превышен лимит. Попробуйте позже.");
       } else {
-        setErrorMessage(data.detail || "Ошибка при повторной отправке");
+        setErrorMessage(data.detail || "Ошибка при повторной отправке кода.");
       }
     } catch (error) {
       console.error("Ошибка при повторной отправке:", error);

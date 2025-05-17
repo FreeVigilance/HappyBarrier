@@ -2,9 +2,11 @@ from django.urls import path
 
 from barriers_management.views import (
     AdminBarrierLimitUpdateView,
+    AdminBarrierSettingsView,
     AdminBarrierUsersListView,
     AdminBarrierView,
     AdminRemoveUserFromBarrierView,
+    AdminSendBalanceCheckView,
     CreateBarrierView,
     MyAdminBarrierListView,
 )
@@ -20,4 +22,6 @@ urlpatterns = [
         AdminRemoveUserFromBarrierView.as_view(),
         name="barrier_remove_user",
     ),
+    path("admin/barriers/<int:id>/settings/", AdminBarrierSettingsView.as_view(), name="admin_barrier_settings"),
+    path("admin/balance/", AdminSendBalanceCheckView.as_view(), name="admin_send_balance_check"),
 ]

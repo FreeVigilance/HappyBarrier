@@ -1,0 +1,66 @@
+{
+  "RTU5025": {
+    "add_phone": {
+      "name": "Добавить номер телефона",
+      "template": "{pwd}A{index}#0007{phone}#",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd"
+        },
+        {
+          "name": "Серийный номер (от 001 до 999)",
+          "key": "index"
+        },
+        {
+          "name": "Номер телефона",
+          "key": "phone"
+        }
+      ],
+      "example": "1234A003#00079854500040#",
+      "response_pattern": "^\\d{3}:\\d{11}.*$"
+    },
+    "delete_phone": {
+      "name": "Удалить номер телефона",
+      "template": "{pwd}A{index}##",
+      "params": [
+        {
+          "name": "Пароль",
+          "key": "pwd"
+        },
+        {
+          "name": "Серийный номер",
+          "key": "index"
+        }
+      ],
+      "example": "1234A003##",
+      "response_pattern": "^\\d{3}:Empty."
+    }
+  },
+  "Telemetrica": {
+    "add_phone": {
+      "name": "Добавить номер телефона",
+      "template": "#60#+7{phone}#",
+      "params": [
+        {
+          "name": "Номер телефона",
+          "key": "phone"
+        }
+      ],
+      "example": "#60#+79854500040#",
+      "response_pattern": "success"
+    },
+    "delete_phone": {
+      "name": "Удалить номер телефона",
+      "template": "#15#+7{phone}#",
+      "params": [
+        {
+          "name": "Номер телефона",
+          "key": "phone"
+        }
+      ],
+      "example": "#15#+79854500040#",
+      "response_pattern": "success"
+    }
+  }
+}
