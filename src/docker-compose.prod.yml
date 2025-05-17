@@ -40,8 +40,6 @@ services:
     image: postgres:15.12
     container_name: postgres_db
     restart: always
-    ports:
-      - "5432:5432"
     env_file:
       - backend/prod.env
     environment:
