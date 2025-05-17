@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from core.utils import created_response, error_response, success_response
+from message_management.services import SMSService
 from users.models import User
 from verifications.constants import VERIFICATION_CODE_RESEND_DELAY
 from verifications.models import Verification, VerificationService
@@ -35,6 +36,7 @@ class SendVerificationCodeView(APIView):
             lambda: User.objects.check_phone_blocked(phone),
             lambda: VerificationService.check_fail_limits(phone),
             lambda: VerificationService.check_unverified_limits(phone),
+            lambda: VerificationService.check_verification_mode(phone, mode),
         ):
             return it
 
@@ -51,8 +53,8 @@ class SendVerificationCodeView(APIView):
 
         verification = VerificationService.create_new_verification(phone, mode)
 
-        # TODO!: Here send the code via SMS, REMOVE code from answer
-        # TODO!: Add extra checks for every request mode.
+        SMSService.send_verification(verification)
+
         return created_response(
             {
                 "message": "Verification code sent.",
@@ -96,4 +98,4 @@ class VerifyCodeView(APIView):
         verification.status = Verification.Status.VERIFIED
         verification.save()
 
-        return success_response("Code verified successfully.", status.HTTP_200_OK)
+        return success_response({"message": "Code verified successfully."}, status.HTTP_200_OK)

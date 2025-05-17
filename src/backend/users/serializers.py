@@ -31,6 +31,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class UpdateUserSerializer(serializers.ModelSerializer):
+    phone_privacy = serializers.ChoiceField(
+        choices=User.PhonePrivacy.choices,
+        error_messages={"invalid_choice": f"Invalid phone privacy. Valid options are: {User.PhonePrivacy.values}"},
+        required=False,
+    )
+
     class Meta:
         model = User
         fields = ["full_name", "phone_privacy"]
@@ -56,7 +62,7 @@ class ChangePhoneSerializer(serializers.Serializer):
         """Check if new phone number is already in use."""
 
         if User.objects.filter(phone=value).exists():
-            raise serializers.ValidationError({"error": "This phone number is already in use."})
+            raise serializers.ValidationError("Given new phone number is already in use.")
         return value
 
 
@@ -72,7 +78,7 @@ class ChangePasswordSerializer(serializers.Serializer):
 
         user = self.context["request"].user
         if not user.check_password(value):
-            raise serializers.ValidationError({"error": "Current password is incorrect."})
+            raise serializers.ValidationError("Current password is incorrect.")
         return value
 
 

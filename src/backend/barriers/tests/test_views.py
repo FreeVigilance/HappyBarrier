@@ -1,8 +1,12 @@
+from unittest.mock import patch
+
 import pytest
 from django.urls import reverse
 from rest_framework import status
 
+from action_history.models import BarrierActionLog
 from barriers.models import BarrierLimit, UserBarrier
+from phones.models import BarrierPhone
 
 
 @pytest.mark.django_db
@@ -73,6 +77,13 @@ class TestBarrierView:
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.data["detail"] == "You do not have access to this barrier."
 
+    def test_barrier_not_found_returns_error(self, authenticated_client):
+        url = reverse("get_barrier", args=[99999])
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["detail"] == "Barrier not found."
+
 
 @pytest.mark.django_db
 class TestBarrierLimitView:
@@ -124,6 +135,13 @@ class TestBarrierLimitView:
         assert response.status_code == status.HTTP_403_FORBIDDEN
         assert response.data["detail"] == "You do not have access to this barrier."
 
+    def test_barrier_not_found_returns_error(self, authenticated_client):
+        url = reverse("get_barrier_limits", args=[99999])
+        response = authenticated_client.get(url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["detail"] == "Barrier not found."
+
 
 @pytest.mark.django_db
 class TestLeaveBarrierView:
@@ -142,7 +160,60 @@ class TestLeaveBarrierView:
         response = authenticated_client.delete(url)
 
         assert response.status_code == status.HTTP_403_FORBIDDEN
-        assert response.data["error"] == "You do not have access to this barrier."
+        assert response.data["detail"] == "You do not have access to this barrier."
+
+    def test_barrier_not_found_returns_error(self, authenticated_client):
+        url = reverse("leave_barrier", args=[99999])
+        response = authenticated_client.delete(url)
+
+        assert response.status_code == status.HTTP_404_NOT_FOUND
+        assert response.data["detail"] == "Barrier not found."
+
+    @patch.object(BarrierPhone, "send_sms_to_delete")
+    def test_all_user_phones_are_removed_on_leave(
+        self, mock_send_sms, authenticated_client, user, private_barrier_with_access
+    ):
+        barrier = private_barrier_with_access
+        url = reverse("leave_barrier", args=[barrier.id])
+
+        BarrierPhone.objects.create(
+            user=user,
+            barrier=barrier,
+            phone=user.phone,
+            type=BarrierPhone.PhoneType.PRIMARY,
+            device_serial_number=1,
+        )
+        BarrierPhone.objects.create(
+            user=user,
+            barrier=barrier,
+            phone="+79998887766",
+            type=BarrierPhone.PhoneType.PERMANENT,
+            device_serial_number=2,
+        )
+
+        response = authenticated_client.delete(url)
+
+        assert response.status_code == status.HTTP_200_OK
+        assert response.data["message"] == "Left the barrier successfully."
+
+        user_barrier = UserBarrier.objects.get(user=user, barrier=barrier)
+        assert not user_barrier.is_active
+
+        phones = BarrierPhone.objects.filter(user=user, barrier=barrier)
+        assert all(not phone.is_active for phone in phones)
+
+        for phone in phones:
+            log = BarrierActionLog.objects.get(
+                phone=phone,
+                barrier=barrier,
+                author=BarrierActionLog.Author.USER,
+                action_type=BarrierActionLog.ActionType.DELETE_PHONE,
+                reason=BarrierActionLog.Reason.BARRIER_EXIT,
+            )
+            assert log.old_value is None
+            assert log.new_value is None
+
+        assert mock_send_sms.call_count == 2
 
 
 @pytest.mark.django_db

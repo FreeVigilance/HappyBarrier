@@ -30,6 +30,11 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split("
 
 CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "https://localhost,https://127.0.0.1").split(",")
 
+CORS_ALLOW_ALL_ORIGINS = os.getenv("DJANGO_CORS_ALLOW_ALL_ORIGINS", True)
+CORS_ALLOWED_ORIGINS = os.getenv("DJANGO_CORS_ALLOWED_ORIGINS", "http://localhost,http://127.0.0.1").split(",")
+CORS_ALLOW_CREDENTIALS = True
+
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": ("users.custom_jwt_auth.CustomJWTAuthentication",),
     "DEFAULT_PERMISSION_CLASSES": [
@@ -49,6 +54,7 @@ SIMPLE_JWT = {
 # Application definition
 
 INSTALLED_APPS = [
+    "django_apscheduler",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -59,8 +65,12 @@ INSTALLED_APPS = [
     "rest_framework_simplejwt",
     "corsheaders",
     "access_requests",
+    "action_history",
     "barriers",
     "barriers_management",
+    "message_management",
+    "phones",
+    "scheduler",
     "users",
     "verifications",
 ]
@@ -139,12 +149,13 @@ LOGGING = {
     "disable_existing_loggers": False,
     "formatters": {
         "verbose": {
-            "format": '{{"time": "{asctime}", "level": "{levelname}", "module": "{name}", "message": "{message}"}}',
+            "format": '{{"time": "{asctime}", "level": "{levelname}", "module": "{name}", "pid": "{process}", '
+            '"thread": "{thread}", "message": "{message}"}}',
             "datefmt": "%Y-%m-%d %H:%M:%S",
             "style": "{",
         },
         "simple": {
-            "format": "[{levelname}] {asctime} {name} - {message}",
+            "format": "[{levelname}] {asctime} {name} (pid={process}, thread={thread}) - {message}",
             "style": "{",
         },
     },
@@ -164,6 +175,11 @@ LOGGING = {
         },
     },
     "loggers": {
+        "apscheduler": {
+            "handlers": ["console", "file"] if not DEBUG else ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "django": {
             "handlers": ["console", "file"] if not DEBUG else ["console"],
             "level": "INFO",
@@ -184,12 +200,32 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "action_history": {
+            "handlers": ["console", "file"] if not DEBUG else ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
         "barriers": {
             "handlers": ["console", "file"] if not DEBUG else ["console"],
             "level": "INFO",
             "propagate": False,
         },
         "barriers_management": {
+            "handlers": ["console", "file"] if not DEBUG else ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "message_management": {
+            "handlers": ["console", "file"] if not DEBUG else ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "phones": {
+            "handlers": ["console", "file"] if not DEBUG else ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "scheduler": {
             "handlers": ["console", "file"] if not DEBUG else ["console"],
             "level": "INFO",
             "propagate": False,
@@ -223,12 +259,9 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
+STATICFILES_DIRS = [os.path.join(BASE_DIR, "static")]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# TODO - something with security
-CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWS_CREDENTIALS = True

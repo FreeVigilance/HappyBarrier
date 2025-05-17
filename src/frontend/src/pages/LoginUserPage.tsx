@@ -7,6 +7,7 @@ const LoginUserPage: React.FC = () => {
     null,
   );
   const [code, setCode] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null); // 👈
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,29 +28,28 @@ const LoginUserPage: React.FC = () => {
       const data = await response.json();
 
       if (data.is_admin) {
-        // Переход к verifyadmin без вызова /api/auth/codes/
         navigate("/verifyadmin", {
-          state: {
-            phone,
-          },
+          state: { phone },
         });
       } else {
-        // Только для обычных пользователей отправляется код
         const codeResult = await sendLoginCode(phone);
 
         if (codeResult) {
           setVerificationToken(codeResult.verification_token);
           setCode(codeResult.code);
-          console.log(
-            "Код и токен получены:",
-            codeResult.code,
-            codeResult.verification_token,
-          );
-
           navigate("/verifyuser", {
             state: {
               phone,
               verification_token: codeResult.verification_token,
+            },
+          });
+        } else {
+          // Показываем ошибку, но переходим
+          navigate("/verifyuser", {
+            state: {
+              phone,
+              verification_token: null,
+              error: "Ошибка при отправке кода. Попробуйте позже.",
             },
           });
         }
@@ -59,6 +59,7 @@ const LoginUserPage: React.FC = () => {
         "Ошибка при проверке администратора или отправке кода:",
         error,
       );
+      setErrorMessage("Ошибка сети. Попробуйте ещё раз.");
     }
   };
 
@@ -78,12 +79,17 @@ const LoginUserPage: React.FC = () => {
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        console.error("Ошибка при отправке кода:", response.statusText);
+        console.error("Ошибка при отправке кода:", data?.error || data.error);
+        setErrorMessage(
+          data?.error + "Retry after" + data?.retry ||
+            "Ошибка при отправке кода",
+        ); // 👈
         return null;
       }
 
-      const data = await response.json();
       localStorage.setItem("verification_token", data.verification_token);
 
       return {
@@ -92,22 +98,20 @@ const LoginUserPage: React.FC = () => {
       };
     } catch (error) {
       console.error("Ошибка при запросе кода:", error);
+      setErrorMessage("Сервер недоступен. Попробуйте позже.");
       return null;
     }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value.replace(/\D/g, "");
+    let value = e.target.value.replace(/[^\d]/g, "");
 
-    if (value.length === 0) {
-      setPhone("");
-      return;
+    if (!value.startsWith("7")) {
+      value = "7" + value;
     }
 
-    if (!value.startsWith("7")) return;
-
-    value = "+" + value;
-    setPhone(value.trim());
+    value = value.slice(0, 11);
+    setPhone("+7" + value.slice(1));
   };
 
   return (
@@ -128,6 +132,7 @@ const LoginUserPage: React.FC = () => {
             required
             autoFocus
           />
+          {errorMessage && <div style={styles.error}>{errorMessage}</div>}
           <button type="submit" style={styles.button}>
             Далее
           </button>
@@ -145,14 +150,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     justifyContent: "center",
     height: "100vh",
     width: "100vw",
-    backgroundColor: "#fef7fb", // фиксированный светло-фиолетовый фон
+    backgroundColor: "#fef7fb",
     padding: "15px",
   },
   card: {
-    backgroundColor: "#ffffff", // белый фон карточки
+    backgroundColor: "#ffffff",
     padding: "5%",
     borderRadius: "15px",
-    boxShadow: "0 4px 15px rgba(90, 68, 120, 0.2)", // фиолетовая тень
+    boxShadow: "0 4px 15px rgba(90, 68, 120, 0.2)",
     textAlign: "center",
     width: "90%",
     maxWidth: "400px",
@@ -160,7 +165,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   title: {
     fontSize: "24px",
     marginBottom: "20px",
-    color: "#5a4478", // насыщенный фиолетовый
+    color: "#5a4478",
     fontWeight: "bold",
   },
   form: {
@@ -172,7 +177,7 @@ const styles: { [key: string]: React.CSSProperties } = {
   label: {
     fontSize: "14px",
     marginBottom: "10px",
-    color: "#5a4478", // фиолетовый для подписей
+    color: "#5a4478",
   },
   input: {
     width: "100%",
@@ -180,14 +185,14 @@ const styles: { [key: string]: React.CSSProperties } = {
     padding: "12px",
     borderRadius: "8px",
     border: "1px solid #ccc",
-    backgroundColor: "#ffffff", // белый инпут
-    color: "#333333", // тёмно-серый текст
+    backgroundColor: "#ffffff",
+    color: "#333333",
     outline: "none",
     transition: "border 0.3s ease",
     marginBottom: "15px",
   },
   button: {
-    backgroundColor: "#5a4478", // фиолетовая кнопка
+    backgroundColor: "#5a4478",
     color: "#ffffff",
     border: "none",
     padding: "12px 20px",
@@ -196,6 +201,16 @@ const styles: { [key: string]: React.CSSProperties } = {
     fontSize: "16px",
     transition: "background 0.3s ease",
     width: "100%",
+  },
+  error: {
+    color: "#d32f2f",
+    fontSize: "14px",
+    marginBottom: "10px",
+    backgroundColor: "#ffe6e6",
+    padding: "10px",
+    borderRadius: "8px",
+    width: "100%",
+    textAlign: "center",
   },
 };
 

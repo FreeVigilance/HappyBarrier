@@ -32,7 +32,7 @@ class BarrierSerializer(serializers.ModelSerializer):
             "phone": None,
         }
 
-        # Show phone number if it's public
+        # Show a phone number if it's public
         if obj.owner.phone_privacy == User.PhonePrivacy.PUBLIC:
             owner_data["phone"] = obj.owner.phone
         elif obj.owner.phone_privacy == User.PhonePrivacy.PROTECTED:
@@ -47,7 +47,7 @@ class BarrierSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         request_user = request.user
 
-        # Show if user has access to this barrier
+        # Show if a user has access to this barrier
         if request_user and UserBarrier.user_has_access_to_barrier(request_user, obj):
             return obj.device_phone
 

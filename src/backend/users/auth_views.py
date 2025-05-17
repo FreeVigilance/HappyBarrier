@@ -35,7 +35,13 @@ class AdminPasswordVerificationView(APIView):
 
         user = User.objects.get_by_phone(phone)
 
-        if user is None or user.role == User.Role.USER or not authenticate(username=phone, password=password):
+        if user is None:
+            return error_response("User not found.", status.HTTP_404_NOT_FOUND)
+        if not user.is_active:
+            return error_response(f"User is blocked. Reason: '{user.block_reason}'.", status.HTTP_403_FORBIDDEN)
+        if user.role == User.Role.USER:
+            return error_response("You do not have permission to perform this action.", status.HTTP_403_FORBIDDEN)
+        if not authenticate(username=phone, password=password):
             return error_response("Invalid phone or password.", status.HTTP_403_FORBIDDEN)
 
         return success_response({"message": "Password verified successfully."})
@@ -65,7 +71,7 @@ class LoginView(APIView):
 
         if not user.is_active:
             reason = user.block_reason
-            return error_response(f"This account is blocked for reason: `{reason}`", status.HTTP_403_FORBIDDEN)
+            return error_response(f"User is blocked. Reason: '{reason}'.", status.HTTP_403_FORBIDDEN)
 
         # Generate JWT tokens
         refresh = RefreshToken.for_user(user)
@@ -112,13 +118,13 @@ class ResetPasswordView(APIView):
         serializer = ResetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        user = User.objects.filter(phone=serializer.validated_data["phone"]).first()
+        user = User.objects.get_by_phone(serializer.validated_data["phone"])
         if not user:
             return error_response("User not found.", status.HTTP_404_NOT_FOUND)
         if not user.is_active:
-            return error_response("User is blocked.", status.HTTP_403_FORBIDDEN)
+            return error_response(f"User is blocked. Reason: '{user.block_reason}'.", status.HTTP_403_FORBIDDEN)
         if user.role == User.Role.USER:
-            return error_response("Only for admins.", status.HTTP_403_FORBIDDEN)
+            return error_response("You do not have permission to perform this action.", status.HTTP_403_FORBIDDEN)
 
         phone = user.phone
         new_password = serializer.validated_data["new_password"]

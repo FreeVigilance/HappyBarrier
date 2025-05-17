@@ -97,7 +97,7 @@ const AdminSmsPage: React.FC = () => {
 
       const verifyJson = await verifyResponse.json();
 
-      if (verifyJson === "Code verified successfully.") {
+      if (verifyJson.message === "Code verified successfully.") {
         const loginResponse = await fetch("/api/auth/login/", {
           method: "POST",
           headers: {
@@ -117,6 +117,10 @@ const AdminSmsPage: React.FC = () => {
           loginData.access_token &&
           loginData.refresh_token
         ) {
+          localStorage.setItem("access_token", loginData.access_token);
+          localStorage.setItem("refresh_token", loginData.refresh_token);
+          localStorage.setItem("phone", phone);
+
           navigate("/admin", {
             state: {
               phone,

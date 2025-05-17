@@ -1,5 +1,5 @@
 # --- Stage 1: Base Python Image ---
-FROM python:3.13-alpine AS base
+FROM python:3.13-slim-bullseye AS base
 
 # Prevents Python from writing pyc files to disk
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -19,7 +19,8 @@ COPY requirements.txt  .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install curl for healthcheck
-RUN apk add --no-cache curl
+# RUN apk add --no-cache curl
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 
 # --- Stage 2: Development ---
 FROM base AS development

@@ -4,11 +4,7 @@ from django.db import models
 from django.utils.timezone import now
 from rest_framework import status
 
-from core.constants import (
-    CHOICE_MAX_LENGTH,
-    PHONE_MAX_LENGTH,
-    STRING_MAX_LENGTH,
-)
+from core.constants import CHOICE_MAX_LENGTH, PHONE_MAX_LENGTH, STRING_MAX_LENGTH
 from core.utils import error_response
 from core.validators import PhoneNumberValidator
 
@@ -84,7 +80,7 @@ class UserManager(BaseUserManager):
         user = self.get_by_phone(phone)
         if user and not user.is_active:
             reason = user.block_reason
-            return error_response(f"This account is blocked for reason: `{reason}`", status.HTTP_403_FORBIDDEN)
+            return error_response(f"User is blocked. Reason: '{reason}'.", status.HTTP_403_FORBIDDEN)
 
 
 class User(AbstractBaseUser, PermissionsMixin):
@@ -130,6 +126,10 @@ class User(AbstractBaseUser, PermissionsMixin):
         default=True,
         help_text="Designates whether this user should be treated as active. "
         "Unselect this instead of deleting accounts.",
+    )
+    is_blocked = models.BooleanField(
+        default=True,
+        help_text="Designates whether this user should be treated as blocked.",
     )
     block_reason = models.CharField(max_length=STRING_MAX_LENGTH, blank=True, default="")
     date_joined = models.DateTimeField(default=now)

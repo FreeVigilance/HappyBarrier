@@ -38,9 +38,14 @@ if not User.objects.filter(role=User.Role.SUPERUSER).exists():
     )
 EOF
 
+log info 'Starting Kafka consumers...'
+python manage.py run_sms_consumers & >> /dev/stdout 2>&1 &
+
+log info 'Starting scheduler...'
+python manage.py run_scheduler & >> /dev/stdout 2>&1 &
 
 log info "Starting Gunicorn..."
 gunicorn --bind 0.0.0.0:8000 backend.wsgi:application \
   --access-logfile - \
   --error-logfile - \
-  --access-logformat '{"time": "%(t)s", "level": "INFO", "status": %(s)s, "method": "%(m)s", "url": "%(U)s", "size": %(b)s, "ip": "%(h)s", "user_agent": "%(a)s"}'
+  --access-logformat '{"time": "%(t)s", "level": "INFO", "pid": %(p)s, "thread": "%(T)s", "status": %(s)s, "method": "%(m)s", "url": "%(U)s", "size": %(b)s, "ip": "%(h)s", "user_agent": "%(a)s"}'

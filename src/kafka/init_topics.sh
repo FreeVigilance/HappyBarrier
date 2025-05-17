@@ -22,7 +22,7 @@ fi
 
 log "Kafka is up. Creating topics..."
 
-TOPICS=("sms_configuration" "sms_verification" "sms_responses" "failed_messages")
+TOPICS=("sms_configuration" "sms_verification" "sms_balance" "sms_responses" "failed_messages")
 
 for topic in "${TOPICS[@]}"; do
   log "Checking topic: $topic"
