@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 
 from confluent_kafka import Message
 
@@ -7,6 +8,8 @@ from kafka.producer import send_to_failed
 from modem.huawei_modem_client import HuaweiModemClient
 
 logger = logging.getLogger("__name__")
+
+MAX_DELAY_SECONDS = 300
 
 
 def handle_sms_verification(modem: HuaweiModemClient, message: Message) -> bool:
@@ -20,8 +23,15 @@ def handle_sms_verification(modem: HuaweiModemClient, message: Message) -> bool:
         phone = data["phone"]
         content = data["content"]
         retries = data["retries"]
+        created_at = data.get("timestamp")
 
-        logger.debug("Handling verification SMS for phone: %s, data: %s", phone, data)
+        logger.info("Handling verification SMS for phone: %s, data: %s", phone, data)
+
+        if created_at:
+            age = time.time() - created_at
+            if age > MAX_DELAY_SECONDS:
+                logger.warning("Skipping SMS to %s: message too old (%d seconds)", phone, age)
+                return True
 
         for attempt in range(retries):
             logger.debug("Attempt %d to send verification SMS to %s", attempt + 1, phone)

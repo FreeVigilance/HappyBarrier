@@ -4,11 +4,13 @@ import time
 
 from confluent_kafka import Message
 
-from config import AVAILABLE_PHONES, MESSAGE_RESPONSE_TIMEOUT_SECONDS
+from config import MESSAGE_RESPONSE_TIMEOUT_SECONDS
 from kafka.producer import send_to_failed, send_to_responses
 from modem.huawei_modem_client import HuaweiModemClient
 
 logger = logging.getLogger("__name__")
+
+MAX_DELAY_SECONDS = 3600
 
 
 def wait_for_reply_from_phone(modem: HuaweiModemClient, phone: str, start_ts: float):
@@ -40,13 +42,16 @@ def handle_sms_configuration(modem: HuaweiModemClient, message: Message) -> bool
         content = data["content"]
         retries = data["retries"]
         message_id = data["message_id"]
+        created_at = data.get("timestamp")
 
         logger.info("Handling configuration SMS for phone: %s", phone)
 
-        if phone not in AVAILABLE_PHONES:
-            logger.warning("Phone %s is not allowed to send configuration SMS.", phone)
-            send_to_failed({"message_id": message_id, "phone": phone, "content": "Not allowed"}, phone)
-            return True
+        if created_at:
+            age = time.time() - created_at
+            if age > MAX_DELAY_SECONDS:
+                logger.warning("Skipping SMS to %s: message too old (%d seconds)", phone, age)
+                send_to_failed({"message_id": message_id, "phone": phone, "content": "Too old"}, phone)
+                return True
 
         for attempt in range(retries):
             logger.debug("Attempt %d to send configuration SMS to %s", attempt + 1, phone)
