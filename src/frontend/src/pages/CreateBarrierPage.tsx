@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { AddressSuggestions } from "react-dadata";
 import "react-dadata/dist/react-dadata.css";
 
+
 const CreateBarrierPage: React.FC = () => {
+  const DADATA_TOKEN = import.meta.env.VITE_DADATA_TOKEN ?? '';
   const navigate = useNavigate();
   const location = useLocation();
   const accessToken = location.state?.access_token;

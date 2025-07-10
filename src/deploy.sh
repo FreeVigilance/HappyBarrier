@@ -1,3 +1,4 @@
+
 #!/bin/bash
 
 set -e
@@ -20,7 +21,7 @@ source ".env"
 set +a
 
 DOMAINS_CSV="$SERVER_DOMAINS"
-#DOMAINS_WITH_HTTPS=$(echo "$DOMAINS_CSV" | sed -E 's/([^,]+)/https:\/\/\1/g')
+# DOMAINS_WITH_HTTPS=$(echo "$DOMAINS_CSV" | sed -E 's/([^,]+)/https:\/\/\1/g')
 HOSTS_ALL=$(echo "$SERVER_DOMAINS,$SERVER_IP,localhost,127.0.0.1,0.0.0.0" \
     | tr ',' '\n' | sed '/^$/d' | paste -sd ',' -)
 
@@ -51,6 +52,7 @@ EOF
 # FRONTEND ENV
 cat > "$FRONTEND_ENV" <<EOF
 VITE_ALLOWED_HOSTS='$HOSTS_ALL'
+VITE_DADATA_TOKEN='$DADATA_TOKEN'
 EOF
 
 # KAFKA ENV

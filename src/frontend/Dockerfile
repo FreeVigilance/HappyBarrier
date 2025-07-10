@@ -39,6 +39,7 @@ COPY --from=build /frontend_app/dist ./dist
 COPY --from=build /frontend_app/node_modules ./node_modules
 COPY --from=build /frontend_app/package.json ./
 COPY --from=build ./frontend_app/vite.config.js ./
+COPY --from=build ./frontend_app/prod.env ./.env
 
 # Expose port used by Vite preview
 EXPOSE 4173
